@@ -20,16 +20,16 @@ void setup() {
   ears.attach(RIGHT_EAR_YAW,   2);
   ears.attach(RIGHT_EAR_PITCH, 3, true);
 
-  if (!ears.loadFromEEPROM()) {
-    Serial.println("No actuator calibration found. Starting calibration...");
-    ears.calibrate(LEFT_EAR_YAW);
-    ears.calibrate(LEFT_EAR_PITCH);
-    ears.calibrate(RIGHT_EAR_YAW);
-    ears.calibrate(RIGHT_EAR_PITCH);
-    ears.saveToEEPROM();
-  } else {
-    Serial.println("Actuator calibration loaded from EEPROM");
-  }
+  // if (!ears.loadFromEEPROM()) {
+  //   Serial.println("No actuator calibration found. Starting calibration...");
+  //   ears.calibrate(LEFT_EAR_YAW);
+  //   ears.calibrate(LEFT_EAR_PITCH);
+  //   ears.calibrate(RIGHT_EAR_YAW);
+  //   ears.calibrate(RIGHT_EAR_PITCH);
+  //   ears.saveToEEPROM();
+  // } else {
+  //   Serial.println("Actuator calibration loaded from EEPROM");
+  // }
 
   /* ---------- SENSOR ---------- */
   if (!imu.begin()) {
@@ -41,22 +41,21 @@ void setup() {
   imu.calibrateGyro();
   Serial.println("Gyro calibration done");
 
-  // if (!imu.loadCalibration()) {
-    // imu.calibrateHeadPose();
-  // }
-
-
   imu.setKalmanParams(
-    0.001f,   // Q
-    4.0f,     // R // (0.072deg)^2 = 0.005deg^2
+    0.001f,   // Q  // gyro
+    4.0f,     // R // accelerometer (0.072deg)^2 = 0.005deg^2
     0.004f    // dt (250 Hz)
   );
+
+  // Uncomment to calibrate imu pose
+  // imu.calibrateHeadPose();
 
   /* ---------- STATE MANAGER ---------- */
   state.begin();
 
   Serial.println("System ready");
-  Serial.println("Type 'ch' for actuator calibration help");
+  Serial.println("Type 'c' for actuator calibration help");
+
 }
 
 /* ================== SERIAL COMMANDS ================== */
@@ -94,12 +93,16 @@ void handleSerialCommands() {
         break;
     }
   }
+  else if (cmd == 'i'){
+    imu.calibrateHeadPose();
+  }
 }
 
 /* ================== LOOP ================== */
 void loop() {
 
-  handleSerialCommands();
+  // Uncomment for actuator Calibration
+  // handleSerialCommands();
 
   imu.update();
 
@@ -127,13 +130,13 @@ void loop() {
   ears.setNormalized(RIGHT_EAR_YAW,   act[RIGHT_EAR_YAW]);
   ears.setNormalized(RIGHT_EAR_PITCH, act[RIGHT_EAR_PITCH]);
 
-  // /* ---------- DEBUG ---------- */
-  // Serial.print("Emotion: ");
-  // Serial.print(state.currentEmotion());
-  // Serial.print(" | RollN: ");
-  // Serial.print(att.roll, 3);
-  // Serial.print(" PitchN: ");
-  // Serial.println(att.pitch, 3);
+  /* ---------- DEBUG ---------- */
+  Serial.print("Emotion: ");
+  Serial.print(state.currentEmotionName());
+  Serial.print(" | RollN: ");
+  Serial.print(att.roll, 3);
+  Serial.print(" PitchN: ");
+  Serial.println(att.pitch, 3);
 
   delay(4); // ~250 Hz
 }

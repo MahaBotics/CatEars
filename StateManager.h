@@ -20,6 +20,7 @@ public:
   void getActuatorTargets(float* out);
 
   Emotion currentEmotion() const;
+  const char* currentEmotionName() const;
 
 private:
   Emotion current;

@@ -50,6 +50,17 @@ Emotion StateManager::currentEmotion() const {
   return current;
 }
 
+const char* StateManager::currentEmotionName() const {
+  switch (current) {
+    case EMO_IDLE:     return "IDLE";
+    case EMO_HAPPY:    return "HAPPY";
+    case EMO_SAD:      return "SAD";
+    case EMO_CURIOUS:  return "CURIOUS";
+    case EMO_ALERT:    return "ALERT";
+    default:           return "UNKNOWN";
+  }
+}
+
 /* ================= DECISION LOGIC ================ */
 /*
   Attitude conventions:
@@ -59,15 +70,19 @@ Emotion StateManager::currentEmotion() const {
 */
 Emotion StateManager::decideEmotion(const Attitude& a) {
 
-  // --- ALERT: sudden rotation ---
-  if (fabs(a.yawRate) > 0.7f) {
-    return EMO_ALERT;
+  if (fabs(a.pitch) < 0.8f && fabs(a.roll) < 0.8f){
+  return EMO_IDLE;
   }
 
-  // --- HAPPY: upright & stable ---
-  if (a.pitch < 0.0f && fabs(a.roll) < 0.5f) {
-    return EMO_HAPPY;
-  }
+  // // --- ALERT: sudden rotation ---
+  // if (fabs(a.yawRate) > 0.7f) {
+  //   return EMO_ALERT;
+  // }
+
+  // // --- HAPPY: upright & stable ---
+  // if (a.pitch < -0.8f && fabs(a.roll) < 0.5f) {
+  //   return EMO_HAPPY;
+  // }
 
   // --- CURIOUS: head tilt ---
   if (fabs(a.roll) > 0.8f) {
@@ -78,8 +93,6 @@ Emotion StateManager::decideEmotion(const Attitude& a) {
   if (a.pitch > 0.9f) {
     return EMO_SAD;
   }
-
-  return EMO_IDLE;
 }
 
 /* ================= TRANSITION ==================== */

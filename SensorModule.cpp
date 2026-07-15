@@ -240,6 +240,7 @@ void SensorModule::sampleStillPose(float &pitchOut,
 
     float p = pitchAngle;
     float r = rollAngle;
+    
 
     // Discard NaN or Inf values
     if (!isfinite(p) || !isfinite(r)) {
@@ -275,51 +276,115 @@ void SensorModule::sampleStillPose(float &pitchOut,
   }
 }
 
-
 void SensorModule::calibrateHeadPose() {
 
   Serial.println("\n=== Head Pose Calibration ===");
 
-  auto waitStill = [](const char* msg) {
-    Serial.println(msg);
-    Serial.println("Hold steady and press ENTER...");
-    while (!Serial.available());
-    while (Serial.available()) Serial.read();
-    delay(500);
-  };
+auto waitStill = [](const char *msg)
+{
+    while (Serial.available())
+        Serial.read();
 
+    Serial.println(msg);
+    Serial.println("Press ENTER when steady...");
+
+    while (true)
+    {
+        if (Serial.available())
+        {
+            char c = Serial.read();
+
+            if (c == '\n' || c == '\r')
+                break;
+        }
+    }
+
+    delay(300);
+};
+
+  float tmpPitch, tmpRoll;
+
+  // 1. Neutral
   waitStill("1) Neutral head position");
   sampleStillPose(calib.pitchNeutral, calib.rollNeutral);
+  
 
+  // 2. Pitch Up
   waitStill("2) MAX PITCH UP");
-  sampleStillPose(calib.pitchUp, calib.rollNeutral); // roll ignored
+  sampleStillPose(calib.pitchUp, tmpRoll);
 
+  // 3. Pitch Down
   waitStill("3) MAX PITCH DOWN");
-  sampleStillPose(calib.pitchDown, calib.rollNeutral);
+  sampleStillPose(calib.pitchDown, tmpRoll);
 
+  // 4. Roll Left
   waitStill("4) MAX ROLL LEFT");
-  sampleStillPose(calib.pitchNeutral, calib.rollLeft); // pitch ignored
+  sampleStillPose(tmpPitch, calib.rollLeft);
 
+  // 5. Roll Right
   waitStill("5) MAX ROLL RIGHT");
-  sampleStillPose(calib.pitchNeutral, calib.rollRight);
+  sampleStillPose(tmpPitch, calib.rollRight);
 
-  /* -------- Print results -------- */
+  // 6. Hold Neutral 
+  waitStill("6) Maintain Neutral head position");
+
+  // Validate calibration
+  if (!(calib.pitchUp < calib.pitchNeutral &&
+        calib.pitchDown > calib.pitchNeutral &&
+        calib.rollLeft < calib.rollNeutral &&
+        calib.rollRight > calib.rollNeutral)) {
+
+    Serial.println("\n❌ Calibration failed!");
+    Serial.println("\n--- Head Calibration Results (degrees) ---");
+
+    Serial.print("Pitch Neutral : ");
+    Serial.println(calib.pitchNeutral, 2);
+
+    Serial.print("Pitch Up      : ");
+    Serial.println(calib.pitchUp, 2);
+
+    Serial.print("Pitch Down    : ");
+    Serial.println(calib.pitchDown, 2);
+
+    Serial.print("Roll Neutral  : ");
+    Serial.println(calib.rollNeutral, 2);
+
+    Serial.print("Roll Left     : ");
+    Serial.println(calib.rollLeft, 2);
+
+    Serial.print("Roll Right    : ");
+    Serial.println(calib.rollRight, 2);
+
+    Serial.println("Please repeat calibration.");
+    return;
+  }
+
   Serial.println("\n--- Head Calibration Results (degrees) ---");
 
-  Serial.print("Pitch Neutral : "); Serial.println(calib.pitchNeutral, 2);
-  Serial.print("Pitch Up      : "); Serial.println(calib.pitchUp, 2);
-  Serial.print("Pitch Down    : "); Serial.println(calib.pitchDown, 2);
+  Serial.print("Pitch Neutral : ");
+  Serial.println(calib.pitchNeutral, 2);
 
-  Serial.print("Roll Neutral  : "); Serial.println(calib.rollNeutral, 2);
-  Serial.print("Roll Left     : "); Serial.println(calib.rollLeft, 2);
-  Serial.print("Roll Right    : "); Serial.println(calib.rollRight, 2);
+  Serial.print("Pitch Up      : ");
+  Serial.println(calib.pitchUp, 2);
+
+  Serial.print("Pitch Down    : ");
+  Serial.println(calib.pitchDown, 2);
+
+  Serial.print("Roll Neutral  : ");
+  Serial.println(calib.rollNeutral, 2);
+
+  Serial.print("Roll Left     : ");
+  Serial.println(calib.rollLeft, 2);
+
+  Serial.print("Roll Right    : ");
+  Serial.println(calib.rollRight, 2);
 
   Serial.println("------------------------------------------");
 
   saveCalibration();
-  Serial.println("Head pose calibration saved\n");
-}
 
+  Serial.println("✅ Head pose calibration saved.");
+}
 
 
 /* ---------- EEPROM METHODS ---------- */
@@ -342,21 +407,27 @@ void SensorModule::saveCalibration() {
 
 
 /* ---------- NORMALIZED GETTERS ---------- */
-
 float SensorModule::pitchNorm() const {
-  // Positive = head DOWN
-  float p = pitchAngle - 40;
 
-  if (p > 0) {
-    // Head down
-    return constrain(p / (50 - 40), 0.0f, 1.0f);
+  float p = pitchAngle - calib.pitchNeutral;
 
-    // return constrain(p / (calib.pitchDown - calib.pitchNeutral), 0.0f, 1.0f);
-  } else {
-    // Head up
-    return constrain(p / (40 - 25), -1.0f, 0.0f);
+  if (p >= 0) {
 
-    // return constrain(p / (calib.pitchNeutral - calib.pitchUp), -1.0f, 0.0f);
+    float range = calib.pitchDown - calib.pitchNeutral;
+
+    if (fabs(range) < 0.1f)
+      return 0.0f;
+
+    return constrain(p / range, 0.0f, 1.0f);
+  }
+  else {
+
+    float range = calib.pitchNeutral - calib.pitchUp;
+
+    if (fabs(range) < 0.1f)
+      return 0.0f;
+
+    return constrain(p / range, -1.0f, 0.0f);
   }
 }
 
