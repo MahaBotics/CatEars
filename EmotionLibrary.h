@@ -17,6 +17,8 @@ struct Attitude {
   float roll;     // left (-) to right (+)
   float pitch;    // down (-) to up (+)
   float yawRate;  // CCW (-) to CW (+)
+  bool doubleTap;
+  bool headshake;
 };
 
 /* ================= EMOTIONS ======================= */

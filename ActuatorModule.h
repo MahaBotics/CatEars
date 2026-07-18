@@ -5,14 +5,11 @@
 
 #include <Arduino.h>
 #include <Wire.h>
-#include <EEPROM.h>
 #include <Adafruit_PWMServoDriver.h>
 
 /* ---------- CONFIG ---------- */
 #define PCA_FREQ        50
 #define SERVO_STEP      10
-#define EEPROM_MAGIC    0xA5
-#define EEPROM_ADDR     0   // starting address
 
 /* ---------- ACTUATOR IDS ---------- */
 enum ActuatorID {
@@ -44,15 +41,11 @@ public:
   void calibrate(uint8_t id);
   void setNormalized(uint8_t id, float value);
 
-  void saveToEEPROM();
-  bool loadFromEEPROM();
-
 private:
   Adafruit_PWMServoDriver pwm;
   Actuator actuators[NUM_ACTUATORS];
   const char* actuatorName(uint8_t id);
-
-  uint16_t eepromBase(uint8_t id);
+  void setDefaultCalibration(uint8_t id);
 };
 
 #endif

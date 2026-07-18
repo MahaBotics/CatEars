@@ -1,3 +1,4 @@
+#include <avr/wdt.h>
 #include "SensorModule.h"
 #include "ActuatorModule.h"
 #include "StateManager.h"
@@ -6,6 +7,7 @@
 SensorModule   imu;
 ActuatorModule ears;
 StateManager   state;
+uint32_t imuUnhealthyStartTime = 0;
 
 /* ================== SETUP ================== */
 void setup() {
@@ -15,21 +17,12 @@ void setup() {
   /* ---------- ACTUATORS ---------- */
   ears.begin();
 
-  ears.attach(LEFT_EAR_YAW,    0, true);
+  ears.attach(LEFT_EAR_YAW,    0);
   ears.attach(LEFT_EAR_PITCH,  1);
-  ears.attach(RIGHT_EAR_YAW,   2);
+  ears.attach(RIGHT_EAR_YAW,   2, true);
   ears.attach(RIGHT_EAR_PITCH, 3, true);
 
-  // if (!ears.loadFromEEPROM()) {
-  //   Serial.println("No actuator calibration found. Starting calibration...");
-  //   ears.calibrate(LEFT_EAR_YAW);
-  //   ears.calibrate(LEFT_EAR_PITCH);
-  //   ears.calibrate(RIGHT_EAR_YAW);
-  //   ears.calibrate(RIGHT_EAR_PITCH);
-  //   ears.saveToEEPROM();
-  // } else {
-  //   Serial.println("Actuator calibration loaded from EEPROM");
-  // }
+  Serial.println("Actuators initialized with default calibration.");
 
   /* ---------- SENSOR ---------- */
   if (!imu.begin()) {
@@ -39,15 +32,14 @@ void setup() {
 
   Serial.println("Calibrating gyro, Hold Still...");
   imu.calibrateGyro();
-  Serial.println("Gyro calibration done");
+  Serial.println("Gyro calibration done"); 
 
-  imu.setKalmanParams(
-    0.001f,   // Q  // gyro
-    4.0f,     // R // accelerometer (0.072deg)^2 = 0.005deg^2
-    0.004f    // dt (250 Hz)
+  imu.setMadgwickParams(
+    0.45f,     // beta (filter gain)
+    0.004f    // dt (250 Hz / 4ms loop period)
   );
 
-  // Uncomment to calibrate imu pose
+  // // Uncomment to calibrate imu pose
   // imu.calibrateHeadPose();
 
   /* ---------- STATE MANAGER ---------- */
@@ -73,29 +65,26 @@ void handleSerialCommands() {
       case '1': ears.calibrate(LEFT_EAR_PITCH);  break;
       case '2': ears.calibrate(RIGHT_EAR_YAW);   break;
       case '3': ears.calibrate(RIGHT_EAR_PITCH); break;
-      case 's':
-        ears.saveToEEPROM();
-        Serial.println("Calibration saved");
-        break;
-      case 'l':
-        ears.loadFromEEPROM();
-        Serial.println("Calibration loaded");
-        break;
+      
+
+
+
+      case 'e':
+        Serial.println("Exit.");
+        return;
+
       default:
         Serial.println("\nCalibration Commands:");
         Serial.println("c0 = LEFT_EAR_YAW");
         Serial.println("c1 = LEFT_EAR_PITCH");
         Serial.println("c2 = RIGHT_EAR_YAW");
         Serial.println("c3 = RIGHT_EAR_PITCH");
-        Serial.println("cs = Save EEPROM");
-        Serial.println("cl = Load EEPROM");
+        Serial.println("ce = Exit");
         Serial.println("ch = Help");
         break;
     }
   }
-  else if (cmd == 'i'){
-    imu.calibrateHeadPose();
-  }
+
 }
 
 /* ================== LOOP ================== */
@@ -107,16 +96,29 @@ void loop() {
   imu.update();
 
   if (!imu.healthy()) {
+    if (imuUnhealthyStartTime == 0) {
+      imuUnhealthyStartTime = millis();
+    }
     Serial.println("⚠ MPU unhealthy");
+    if (millis() - imuUnhealthyStartTime > 1000) {
+      Serial.println("IMU unhealthy for >1s. Resetting board...");
+      delay(100);
+      wdt_enable(WDTO_15MS);
+      while (true);
+    }
     delay(100);
     return;
+  } else {
+    imuUnhealthyStartTime = 0;
   }
 
   /* ---------- BUILD ATTITUDE ---------- */
   Attitude att;
-  att.roll    = imu.rollNorm();     // [-1, 1]
-  att.pitch   = imu.pitchNorm();//bias    // [-1, 1]
-  att.yawRate = 0;// TO DO : imu.yawRateNorm();  // [-1, 1]
+  att.roll      = imu.rollNorm();     // [-1, 1]
+  att.pitch     = imu.pitchNorm();//bias    // [-1, 1]
+  att.yawRate   = 0;// TO DO : imu.yawRateNorm();  // [-1, 1]
+  att.doubleTap = imu.checkDoubleTap();
+  att.headshake = imu.checkHeadshake();
 
   /* ---------- STATE MACHINE ---------- */
   state.update(att);
@@ -133,10 +135,13 @@ void loop() {
   /* ---------- DEBUG ---------- */
   Serial.print("Emotion: ");
   Serial.print(state.currentEmotionName());
-  Serial.print(" | RollN: ");
-  Serial.print(att.roll, 3);
-  Serial.print(" PitchN: ");
-  Serial.println(att.pitch, 3);
-
-  delay(4); // ~250 Hz
+  Serial.print(" | Roll: ");
+  Serial.print(imu.roll(), 1);
+  Serial.print(" (");
+  Serial.print(att.roll, 2);
+  Serial.print(") | Pitch: ");
+  Serial.print(imu.pitch(), 1);
+  Serial.print(" (");
+  Serial.print(att.pitch, 2);
+  Serial.println(")");
 }

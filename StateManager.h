@@ -4,7 +4,7 @@
 
 /* ================= CONFIG ================= */
 #define EMOTION_HOLD_TIME_MS 600   // min time before switching again
-#define TRANSITION_RATE     0.02f  // smoothing speed
+#define TRANSITION_RATE     0.8f  // smoothing speed
 
 /* ================= STATE MANAGER ================= */
 class StateManager {
@@ -27,6 +27,8 @@ private:
   Emotion target;
 
   uint32_t lastTransitionTime;
+  uint32_t happyStartTime;
+  uint32_t sadStartTime;
 
   float currentOutput[NUM_ACTUATORS];
   float targetOutput[NUM_ACTUATORS];

@@ -56,13 +56,16 @@ void EmotionLibrary::idle(const Attitude&, float* o) {
 
 // --- HAPPY: perked & forward ---
 void EmotionLibrary::happy(const Attitude& att, float* o) {
-  float perk = gains.pitchGain * -att.pitch;
+  float t = millis() * 0.001f;
+  // Perk up base offset (0.8f) + fast pitch oscillation (rate: 6.0 rad/s, amplitude: 0.2f)
+  float f = 2.0f;
+  float happyWiggle = 0.8f + 0.2f * sin(2* 3.14159f*f*t);
 
-  o[LEFT_EAR_PITCH]  += perk;
-  o[RIGHT_EAR_PITCH] += perk;
+  o[LEFT_EAR_PITCH]  = happyWiggle;
+  o[RIGHT_EAR_PITCH] = happyWiggle;
 
-  o[LEFT_EAR_YAW]  -= 0.3f;
-  o[RIGHT_EAR_YAW] -= 0.3f;
+  o[LEFT_EAR_YAW]  = -0.3f;
+  o[RIGHT_EAR_YAW] = -0.3f;
 }
 
 // --- CURIOUS: asymmetric attention toward tilt direction ---
@@ -92,7 +95,7 @@ void EmotionLibrary::curious(const Attitude& att, float* o) {
   else {
 
     // Yaw: left ear forward, right ear back
-    o[LEFT_EAR_YAW]  += yawInfluence - 0.3f;
+    o[LEFT_EAR_YAW]  += yawInfluence + 0.3f;
     o[RIGHT_EAR_YAW] += 0.3f;
 
     // Pitch: left ear perks up
